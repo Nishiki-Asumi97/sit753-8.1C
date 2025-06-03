@@ -1,0 +1,60 @@
+pipeline {
+    agent any
+
+    tools {
+        maven 'Maven 3.8.6' 
+    }
+
+    stages {
+        stage('Build') {
+            steps {
+                echo 'Building the project...'
+                bat 'mvn clean package'
+            }
+        }
+
+        stage('Unit and Integration Tests') {
+            steps {
+                echo 'Running tests...'
+                bat 'mvn test'
+            }
+        }
+
+        stage('Code Analysis') {
+            steps {
+                echo 'Running SonarQube analysis...'
+                withSonarQubeEnv('SonarQube') {
+                    bat 'mvn sonar:sonar'
+                }
+            }
+        }
+
+        stage('Security Scan') {
+            steps {
+                echo 'Running security scan with OWASP Dependency-Check...'
+                bat 'mvn org.owasp:dependency-check-maven:check'
+            }
+        }
+
+        stage('Deploy to Staging') {
+            steps {
+                echo 'Deploying to Staging server...'
+                bat 'scp target\\mavenpipeline-1.0-SNAPSHOT.jar ec2-user@STAGING_IP:/home/ec2-user/staging/'
+            }
+        }
+
+        stage('Integration Tests on Staging') {
+            steps {
+                echo 'Running tests on staging...'
+                bat 'ssh ec2-user@STAGING_IP "java -jar /home/ec2-user/staging/mavenpipeline-1.0-SNAPSHOT.jar --test"'
+            }
+        }
+
+        stage('Deploy to Production') {
+            steps {
+                echo 'Deploying to Production server...'
+                bat 'scp target\\mavenpipeline-1.0-SNAPSHOT.jar ec2-user@PROD_IP:/home/ec2-user/production/'
+            }
+        }
+    }
+}
